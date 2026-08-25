@@ -52,7 +52,24 @@ def main() -> None:
 
     if not workspace:
         raise RuntimeError("GITHUB_WORKSPACE is not set")
+    print("\nWorkspace contents:")
+    print(run(["ls", "-la"], cwd=workspace))
 
+    git_dir = Path(workspace) / ".git"
+    print(f"\n.git exists: {git_dir.exists()}")
+    print(f".git is dir: {git_dir.is_dir()}")
+
+    print("\nGit repository check:")
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+    )
+
+    print(f"rev-parse exit: {result.returncode}")
+    print(f"rev-parse stdout: {result.stdout}")
+    print(f"rev-parse stderr: {result.stderr}")
     base_sha = str(pr["base_sha"])
     head_sha = str(pr["head_sha"])
 
