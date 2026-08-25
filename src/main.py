@@ -6,13 +6,22 @@ from typing import Any
 
 
 def run(command: list[str], cwd: str) -> str:
+    print(f"\nRunning: {' '.join(command)}")
+    print(f"Working directory: {cwd}")
+
     result = subprocess.run(
         command,
         cwd=cwd,
         capture_output=True,
         text=True,
-        check=True,
     )
+
+    if result.returncode != 0:
+        print(f"Exit code: {result.returncode}")
+        print(f"stdout: {result.stdout}")
+        print(f"stderr: {result.stderr}")
+        raise RuntimeError(f"Command failed: {' '.join(command)}")
+
     return result.stdout.strip()
 
 
