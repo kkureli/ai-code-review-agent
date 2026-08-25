@@ -1,0 +1,15 @@
+name: "AI Code Review Agent"
+description: "Automated repository-aware AI code reviews for GitHub pull requests"
+
+branding:
+  icon: "code"
+  color: "blue"
+
+inputs:
+  github-token:
+    description: "GitHub token"
+    required: true
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
