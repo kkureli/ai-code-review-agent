@@ -20,12 +20,15 @@ def run(command: list[str], cwd: str) -> str:
         print(f"Exit code: {result.returncode}")
         print(f"stdout: {result.stdout}")
         print(f"stderr: {result.stderr}")
+
         raise RuntimeError(f"Command failed: {' '.join(command)}")
 
     return result.stdout.strip()
 
 
-def get_pull_request_info(event: dict[str, Any]) -> dict[str, str | int]:
+def get_pull_request_info(
+    event: dict[str, Any],
+) -> dict[str, str | int]:
     pull_request = event["pull_request"]
 
     return {
@@ -52,28 +55,26 @@ def main() -> None:
 
     if not workspace:
         raise RuntimeError("GITHUB_WORKSPACE is not set")
-    print("\nWorkspace contents:")
-    print(run(["ls", "-la"], cwd=workspace))
 
-    git_dir = Path(workspace) / ".git"
-    print(f"\n.git exists: {git_dir.exists()}")
-    print(f".git is dir: {git_dir.is_dir()}")
-
-    print("\nGit repository check:")
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
+    # The repository is mounted into the Docker container
+    # with a different owner than the container process.
+    # Git blocks it unless we explicitly trust this workspace.
+    run(
+        [
+            "git",
+            "config",
+            "--global",
+            "--add",
+            "safe.directory",
+            workspace,
+        ],
         cwd=workspace,
-        capture_output=True,
-        text=True,
     )
 
-    print(f"rev-parse exit: {result.returncode}")
-    print(f"rev-parse stdout: {result.stdout}")
-    print(f"rev-parse stderr: {result.stderr}")
     base_sha = str(pr["base_sha"])
     head_sha = str(pr["head_sha"])
 
-    print("AI Code Review Agent")
+    print("\nAI Code Review Agent")
     print(f"PR: #{pr['pr_number']}")
     print(f"Base SHA: {base_sha}")
     print(f"Head SHA: {head_sha}")
