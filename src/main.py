@@ -4,9 +4,9 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from reviewer import review_pull_request
 from src.context_collector import collect_file_contexts
 from src.diff_parser import parse_changed_lines
+from src.reviewer import review_pull_request
 
 
 def run(command: list[str], cwd: str) -> str:

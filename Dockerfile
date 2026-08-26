@@ -12,4 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src /app/src
 
-ENTRYPOINT ["python", "/app/src/main.py"]
+ENV PYTHONPATH=/app
+
+ENTRYPOINT ["python", "-m", "src.main"]
