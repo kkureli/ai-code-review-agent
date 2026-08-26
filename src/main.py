@@ -6,6 +6,7 @@ from typing import Any
 
 from src.context_collector import collect_file_contexts
 from src.diff_parser import parse_changed_lines
+from src.finding_validator import validate_findings
 from src.reviewer import review_pull_request
 
 
@@ -59,13 +60,15 @@ def main() -> None:
 
     if not workspace:
         raise RuntimeError("GITHUB_WORKSPACE is not set")
+
     api_key = os.environ.get("INPUT_OPENAI-API-KEY")
 
     if not api_key:
         raise RuntimeError("openai-api-key input is required")
-    # The repository is mounted into the Docker container
-    # with a different owner than the container process.
-    # Git blocks it unless we explicitly trust this workspace.
+
+    # The checked-out repository is mounted into the
+    # Docker container with a different owner.
+    # Git blocks access unless we explicitly trust it.
     run(
         [
             "git",
@@ -108,6 +111,7 @@ def main() -> None:
     )
 
     changed_lines = parse_changed_lines(diff)
+
     file_contexts = collect_file_contexts(
         workspace=workspace,
         changed_lines=changed_lines,
@@ -120,22 +124,37 @@ def main() -> None:
         file_contexts=file_contexts,
     )
 
+    changed_file_set = {file for file in changed_files.splitlines() if file}
+
+    validated_findings = validate_findings(
+        findings=review.findings,
+        changed_lines=changed_lines,
+        changed_files=changed_file_set,
+    )
+
     print("\nAI Review Summary:")
     print(review.summary)
 
-    print("\nFindings:")
+    print(f"\nRaw AI findings: {len(review.findings)}")
 
-    if not review.findings:
-        print("No meaningful issues found.")
+    print(f"Validated findings: {len(validated_findings)}")
+
+    print("\nValidated Findings:")
+
+    if not validated_findings:
+        print("No publishable issues found.")
     else:
-        for finding in review.findings:
+        for finding in validated_findings:
             print(
                 f"\n[{finding.severity.upper()}] "
                 f"{finding.category} "
                 f"{finding.file}:{finding.line}"
             )
+
             print(f"Title: {finding.title}")
+
             print(f"Confidence: {finding.confidence:.2f}")
+
             print(f"Explanation: {finding.explanation}")
 
             if finding.suggested_fix:
@@ -154,11 +173,6 @@ def main() -> None:
 
     print("\nRaw diff:")
     print(diff or "(empty)")
-    print("\nChanged files:")
-    print(changed_files or "(none)")
-
-    print("\nDiff:")
-    print(diff or "(empty)")
 
     print("\nRepository context:")
 
@@ -168,8 +182,11 @@ def main() -> None:
         for context in file_contexts:
             print(
                 f"\n--- {context.file} "
-                f"lines {context.start_line}-{context.end_line} ---"
+                f"lines "
+                f"{context.start_line}-"
+                f"{context.end_line} ---"
             )
+
             print(context.content)
 
 
