@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from src.context_collector import collect_file_contexts
 from src.diff_parser import parse_changed_lines
 
 
@@ -103,6 +104,10 @@ def main() -> None:
     )
 
     changed_lines = parse_changed_lines(diff)
+    file_contexts = collect_file_contexts(
+        workspace=workspace,
+        changed_lines=changed_lines,
+    )
     print("\nChanged files:")
     print(changed_files or "(none)")
 
@@ -121,6 +126,18 @@ def main() -> None:
 
     print("\nDiff:")
     print(diff or "(empty)")
+
+    print("\nRepository context:")
+
+    if not file_contexts:
+        print("(none)")
+    else:
+        for context in file_contexts:
+            print(
+                f"\n--- {context.file} "
+                f"lines {context.start_line}-{context.end_line} ---"
+            )
+            print(context.content)
 
 
 if __name__ == "__main__":
