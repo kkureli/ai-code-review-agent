@@ -195,16 +195,19 @@ def main() -> None:
             if finding.suggested_fix:
                 print(f"Suggested fix: {finding.suggested_fix}")
 
-    publish_review(
-        token=github_token,
-        repository=repository,
-        pr_number=int(pr["pr_number"]),
-        head_sha=head_sha,
-        findings=validated_findings,
-        api_url=github_api_url,
-    )
+        published = publish_review(
+            token=github_token,
+            repository=repository,
+            pr_number=int(pr["pr_number"]),
+            head_sha=head_sha,
+            findings=validated_findings,
+            api_url=github_api_url,
+        )
 
-    print("\nGitHub review published.")
+    if published:
+        print("\nGitHub review published.")
+    else:
+        print("\nReview already published for this commit. Skipping.")
 
     print("\nChanged files:")
     print(changed_files or "(none)")

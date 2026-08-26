@@ -5,6 +5,8 @@ from typing import Any
 
 from src.reviewer import ReviewFinding
 
+REVIEW_MARKER = "ai-code-review-agent"
+
 
 def format_finding(
     finding: ReviewFinding,
@@ -32,9 +34,11 @@ def build_review_payload(
     inline_comments: list[dict[str, Any]] = []
 
     summary_lines = [
+        (f"<!-- {REVIEW_MARKER}:{head_sha} -->"),
+        "",
         "## AI Code Review",
         "",
-        f"**Publishable findings:** {len(findings)}",
+        (f"**Publishable findings:** {len(findings)}"),
     ]
 
     if not findings:
@@ -128,16 +132,20 @@ def build_review_payload(
 
 def github_request(
     *,
+    method: str,
     url: str,
     token: str,
-    payload: dict[str, Any],
-) -> dict[str, Any]:
-    data = json.dumps(payload).encode("utf-8")
+    payload: dict[str, Any] | None = None,
+) -> Any:
+    data = None
+
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
 
     request = urllib.request.Request(
         url=url,
         data=data,
-        method="POST",
+        method=method,
         headers={
             "Authorization": (f"Bearer {token}"),
             "Accept": ("application/vnd.github+json"),
@@ -154,7 +162,7 @@ def github_request(
             body = response.read().decode("utf-8")
 
             if not body:
-                return {}
+                return None
 
             return json.loads(body)
 
@@ -166,6 +174,31 @@ def github_request(
         ) from error
 
 
+def review_already_published(
+    *,
+    token: str,
+    repository: str,
+    pr_number: int,
+    head_sha: str,
+    api_url: str,
+) -> bool:
+    reviews = github_request(
+        method="GET",
+        url=(f"{api_url}/repos/{repository}/pulls/{pr_number}/reviews"),
+        token=token,
+    )
+
+    marker = f"<!-- {REVIEW_MARKER}:{head_sha} -->"
+
+    for review in reviews or []:
+        body = review.get("body") or ""
+
+        if marker in body:
+            return True
+
+    return False
+
+
 def publish_review(
     *,
     token: str,
@@ -174,14 +207,26 @@ def publish_review(
     head_sha: str,
     findings: list[ReviewFinding],
     api_url: str = "https://api.github.com",
-) -> None:
+) -> bool:
+    if review_already_published(
+        token=token,
+        repository=repository,
+        pr_number=pr_number,
+        head_sha=head_sha,
+        api_url=api_url,
+    ):
+        return False
+
     payload = build_review_payload(
         findings=findings,
         head_sha=head_sha,
     )
 
     github_request(
+        method="POST",
         url=(f"{api_url}/repos/{repository}/pulls/{pr_number}/reviews"),
         token=token,
         payload=payload,
     )
+
+    return True
