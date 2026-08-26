@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from reviewer import review_pull_request
 from src.context_collector import collect_file_contexts
 from src.diff_parser import parse_changed_lines
 
@@ -58,7 +59,10 @@ def main() -> None:
 
     if not workspace:
         raise RuntimeError("GITHUB_WORKSPACE is not set")
+    api_key = os.environ.get("INPUT_OPENAI-API-KEY")
 
+    if not api_key:
+        raise RuntimeError("openai-api-key input is required")
     # The repository is mounted into the Docker container
     # with a different owner than the container process.
     # Git blocks it unless we explicitly trust this workspace.
@@ -108,6 +112,35 @@ def main() -> None:
         workspace=workspace,
         changed_lines=changed_lines,
     )
+
+    review = review_pull_request(
+        api_key=api_key,
+        diff=diff,
+        changed_lines=changed_lines,
+        file_contexts=file_contexts,
+    )
+
+    print("\nAI Review Summary:")
+    print(review.summary)
+
+    print("\nFindings:")
+
+    if not review.findings:
+        print("No meaningful issues found.")
+    else:
+        for finding in review.findings:
+            print(
+                f"\n[{finding.severity.upper()}] "
+                f"{finding.category} "
+                f"{finding.file}:{finding.line}"
+            )
+            print(f"Title: {finding.title}")
+            print(f"Confidence: {finding.confidence:.2f}")
+            print(f"Explanation: {finding.explanation}")
+
+            if finding.suggested_fix:
+                print(f"Suggested fix: {finding.suggested_fix}")
+
     print("\nChanged files:")
     print(changed_files or "(none)")
 

@@ -10,6 +10,10 @@ inputs:
     description: "GitHub token"
     required: true
 
+  openai-api-key:
+    description: "OpenAI API key"
+    required: true
+
 runs:
   using: "docker"
   image: "Dockerfile"
