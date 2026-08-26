@@ -3,9 +3,14 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from src.finding_validator import select_inline_findings
 from src.reviewer import ReviewFinding
 
 REVIEW_MARKER = "ai-code-review-agent"
+
+
+def review_marker(head_sha: str) -> str:
+    return f"<!-- {REVIEW_MARKER}:{head_sha} -->"
 
 
 def format_finding(
@@ -30,16 +35,29 @@ def build_review_payload(
     *,
     findings: list[ReviewFinding],
     head_sha: str,
+    max_comments: int = 10,
 ) -> dict[str, Any]:
+    publishable = select_inline_findings(
+        findings,
+        max_comments=max_comments,
+    )
+
     inline_comments: list[dict[str, Any]] = []
 
     summary_lines = [
-        (f"<!-- {REVIEW_MARKER}:{head_sha} -->"),
+        review_marker(head_sha),
         "",
         "## AI Code Review",
         "",
         (f"**Publishable findings:** {len(findings)}"),
     ]
+
+    omitted = max(0, len(findings) - len(publishable))
+    if omitted:
+        summary_lines.append(
+            f"**Inline comments capped at {max_comments}.** "
+            f"{omitted} lower-priority finding(s) omitted from inline comments."
+        )
 
     if not findings:
         summary_lines.extend(
@@ -70,6 +88,7 @@ def build_review_payload(
                 f"({location})"
             )
 
+        for finding in publishable:
             if finding.category != "tests" and finding.line is not None:
                 inline_comments.append(
                     {
@@ -167,10 +186,30 @@ def github_request(
             return json.loads(body)
 
     except urllib.error.HTTPError as error:
-        error_body = error.read().decode("utf-8")
+        error_body = error.read().decode("utf-8", errors="replace")
+
+        if error.code in {401, 403}:
+            raise RuntimeError(
+                "GitHub API permission failure "
+                f"({error.code}). Ensure the workflow has "
+                "`pull-requests: write` and a valid github-token. "
+                f"Details: {error_body[:500]}"
+            ) from error
+
+        if error.code == 422:
+            raise RuntimeError(
+                "GitHub rejected the review payload (422). "
+                "An inline comment may target an invalid line/path. "
+                f"Details: {error_body[:500]}"
+            ) from error
 
         raise RuntimeError(
-            f"GitHub API request failed ({error.code}): {error_body}"
+            f"GitHub API request failed ({error.code}): {error_body[:500]}"
+        ) from error
+
+    except urllib.error.URLError as error:
+        raise RuntimeError(
+            f"GitHub API network error: {error.reason}"
         ) from error
 
 
@@ -188,7 +227,7 @@ def review_already_published(
         token=token,
     )
 
-    marker = f"<!-- {REVIEW_MARKER}:{head_sha} -->"
+    marker = review_marker(head_sha)
 
     for review in reviews or []:
         body = review.get("body") or ""
@@ -207,6 +246,7 @@ def publish_review(
     head_sha: str,
     findings: list[ReviewFinding],
     api_url: str = "https://api.github.com",
+    max_comments: int = 10,
 ) -> bool:
     if review_already_published(
         token=token,
@@ -220,6 +260,7 @@ def publish_review(
     payload = build_review_payload(
         findings=findings,
         head_sha=head_sha,
+        max_comments=max_comments,
     )
 
     github_request(

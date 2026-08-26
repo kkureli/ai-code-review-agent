@@ -1,5 +1,7 @@
 from typing import Literal
 
+import time
+
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
@@ -211,17 +213,65 @@ def review_pull_request(
         file_contexts=file_contexts,
     )
 
-    response = client.responses.parse(
-        model=model,
-        instructions=REVIEWER_INSTRUCTIONS,
-        input=review_input,
-        text_format=ReviewResult,
-        store=False,
-    )
+    last_error: Exception | None = None
 
-    result = response.output_parsed
+    for attempt in range(1, 4):
+        try:
+            response = client.responses.parse(
+                model=model,
+                instructions=REVIEWER_INSTRUCTIONS,
+                input=review_input,
+                text_format=ReviewResult,
+                store=False,
+            )
 
-    if result is None:
-        raise RuntimeError("OpenAI returned no parsed review result")
+            result = response.output_parsed
 
-    return result
+            if result is None:
+                raise RuntimeError(
+                    "OpenAI returned no parsed review result"
+                )
+
+            return result
+
+        except Exception as error:
+            message = str(error).lower()
+            transient = any(
+                token in message
+                for token in (
+                    "rate limit",
+                    "429",
+                    "timeout",
+                    "timed out",
+                    "connection",
+                    "temporarily unavailable",
+                    "503",
+                    "502",
+                )
+            )
+
+            # Prefer typed OpenAI errors when available.
+            error_name = type(error).__name__
+            if error_name in {
+                "RateLimitError",
+                "APIConnectionError",
+                "APITimeoutError",
+                "InternalServerError",
+            }:
+                transient = True
+
+            last_error = error
+
+            if not transient or attempt == 3:
+                break
+
+            print(
+                f"Transient OpenAI error on attempt {attempt}/3: "
+                f"{type(error).__name__}. Retrying..."
+            )
+            time.sleep(attempt * 2)
+
+    assert last_error is not None
+    raise RuntimeError(
+        f"OpenAI review failed: {type(last_error).__name__}: {last_error}"
+    ) from last_error
