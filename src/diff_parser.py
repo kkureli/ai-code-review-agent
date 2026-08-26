@@ -1,10 +1,7 @@
 import re
 from dataclasses import dataclass
 
-
-HUNK_HEADER = re.compile(
-    r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@"
-)
+HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
 @dataclass
@@ -22,7 +19,7 @@ def parse_changed_lines(diff: str) -> list[ChangedLine]:
 
     for line in diff.splitlines():
         if line.startswith("+++ b/"):
-            current_file = line[len("+++ b/"):]
+            current_file = line[len("+++ b/") :]
             continue
 
         hunk_match = HUNK_HEADER.match(line)
@@ -42,15 +39,13 @@ def parse_changed_lines(diff: str) -> list[ChangedLine]:
                     content=line[1:],
                 )
             )
+
             new_line_number += 1
 
         elif line.startswith("-"):
-            # Deleted lines do not exist on the new PR side,
-            # so they do not advance the new-file line number.
             continue
 
         else:
-            # Context line exists in the new version.
             new_line_number += 1
 
     return changed_lines

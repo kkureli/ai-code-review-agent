@@ -63,6 +63,7 @@ are realistically possible.
 Do not assume malformed input merely to create a finding.
 
 Do not report missing tests merely because no test file was changed.
+
 Report a test finding only when the pull request introduces or changes
 meaningful behavior and a concrete important regression path is evident.
 
@@ -85,34 +86,30 @@ Confidence guidance:
 - 0.75-0.89: strongly supported with minimal assumptions
 - below 0.75: do not report the finding
 
-For correctness, security, and style findings, point to a concrete
-added or modified line whenever possible.
+For correctness, security, and style findings, point to the exact
+added or modified line containing the problematic expression.
 
-Test findings may use no specific line when the issue applies to the
-pull request as a whole.
+For test findings that apply to the pull request as a whole,
+always return line=null.
 
 Suggested fixes must actually resolve the reported issue.
+
 If a safe fix cannot be determined from the available context,
 describe the required change without inventing implementation details.
 
 A missing-key, null, or type-safety concern is not a finding by itself.
+
 There must be evidence in the supplied diff or repository context that
 the questioned input can actually occur.
 
 Do not invent possible callers, payloads, runtime values, API contracts,
 or malformed inputs that are not demonstrated by the supplied context.
 
-For correctness, security, and style findings, the line must point to
-the exact changed line containing the problematic expression, not the
-function declaration or a nearby line.
-
-For test findings that apply to the pull request as a whole, always
-return line=null.
-
 Never suggest bool(value) as validation for a boolean value because
-non-empty strings such as "false" are truthy. If the required input
-contract is unknown, describe the required validation without inventing
-a concrete implementation.
+non-empty strings such as "false" are truthy.
+
+If the required input contract is unknown, describe the required
+validation without inventing a concrete implementation.
 
 Ambiguity alone is not a correctness bug.
 
@@ -172,7 +169,8 @@ def build_review_input(
     contexts_text = "\n\n".join(
         (
             f"FILE: {context.file}\n"
-            f"LINES: {context.start_line}-{context.end_line}\n"
+            f"LINES: "
+            f"{context.start_line}-{context.end_line}\n"
             f"{context.content}"
         )
         for context in file_contexts

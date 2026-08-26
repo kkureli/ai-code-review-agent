@@ -36,7 +36,6 @@ def collect_file_contexts(
         try:
             lines = file_path.read_text().splitlines()
         except UnicodeDecodeError:
-            # Binary / non-text file.
             continue
 
         first_changed_line = min(line_numbers)
@@ -52,9 +51,7 @@ def collect_file_contexts(
             last_changed_line + context_lines,
         )
 
-        selected_lines = lines[
-            start_line - 1 : end_line
-        ]
+        selected_lines = lines[start_line - 1 : end_line]
 
         numbered_content = "\n".join(
             f"{line_number}: {content}"

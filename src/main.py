@@ -4,13 +4,27 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from src.context_collector import collect_file_contexts
-from src.diff_parser import parse_changed_lines
-from src.finding_validator import validate_findings
-from src.reviewer import review_pull_request
+from src.context_collector import (
+    collect_file_contexts,
+)
+from src.diff_parser import (
+    parse_changed_lines,
+)
+from src.finding_validator import (
+    validate_findings,
+)
+from src.github_publisher import (
+    publish_review,
+)
+from src.reviewer import (
+    review_pull_request,
+)
 
 
-def run(command: list[str], cwd: str) -> str:
+def run(
+    command: list[str],
+    cwd: str,
+) -> str:
     print(f"\nRunning: {' '.join(command)}")
     print(f"Working directory: {cwd}")
 
@@ -38,8 +52,8 @@ def get_pull_request_info(
 
     return {
         "pr_number": event["number"],
-        "base_sha": pull_request["base"]["sha"],
-        "head_sha": pull_request["head"]["sha"],
+        "base_sha": (pull_request["base"]["sha"]),
+        "head_sha": (pull_request["head"]["sha"]),
     }
 
 
@@ -66,9 +80,21 @@ def main() -> None:
     if not api_key:
         raise RuntimeError("openai-api-key input is required")
 
-    # The checked-out repository is mounted into the
-    # Docker container with a different owner.
-    # Git blocks access unless we explicitly trust it.
+    github_token = os.environ.get("INPUT_GITHUB-TOKEN")
+
+    if not github_token:
+        raise RuntimeError("github-token input is required")
+
+    repository = os.environ.get("GITHUB_REPOSITORY")
+
+    if not repository:
+        raise RuntimeError("GITHUB_REPOSITORY is not set")
+
+    github_api_url = os.environ.get(
+        "GITHUB_API_URL",
+        "https://api.github.com",
+    )
+
     run(
         [
             "git",
@@ -82,6 +108,7 @@ def main() -> None:
     )
 
     base_sha = str(pr["base_sha"])
+
     head_sha = str(pr["head_sha"])
 
     print("\nAI Code Review Agent")
@@ -109,6 +136,10 @@ def main() -> None:
         ],
         cwd=workspace,
     )
+
+    if not diff:
+        print("\nNo pull request diff found.")
+        return
 
     changed_lines = parse_changed_lines(diff)
 
@@ -143,12 +174,16 @@ def main() -> None:
 
     if not validated_findings:
         print("No publishable issues found.")
+
     else:
         for finding in validated_findings:
             print(
-                f"\n[{finding.severity.upper()}] "
+                f"\n["
+                f"{finding.severity.upper()}"
+                f"] "
                 f"{finding.category} "
-                f"{finding.file}:{finding.line}"
+                f"{finding.file}:"
+                f"{finding.line}"
             )
 
             print(f"Title: {finding.title}")
@@ -160,6 +195,17 @@ def main() -> None:
             if finding.suggested_fix:
                 print(f"Suggested fix: {finding.suggested_fix}")
 
+    publish_review(
+        token=github_token,
+        repository=repository,
+        pr_number=int(pr["pr_number"]),
+        head_sha=head_sha,
+        findings=validated_findings,
+        api_url=github_api_url,
+    )
+
+    print("\nGitHub review published.")
+
     print("\nChanged files:")
     print(changed_files or "(none)")
 
@@ -170,24 +216,6 @@ def main() -> None:
     else:
         for changed_line in changed_lines:
             print(f"{changed_line.file}:{changed_line.line} {changed_line.content}")
-
-    print("\nRaw diff:")
-    print(diff or "(empty)")
-
-    print("\nRepository context:")
-
-    if not file_contexts:
-        print("(none)")
-    else:
-        for context in file_contexts:
-            print(
-                f"\n--- {context.file} "
-                f"lines "
-                f"{context.start_line}-"
-                f"{context.end_line} ---"
-            )
-
-            print(context.content)
 
 
 if __name__ == "__main__":

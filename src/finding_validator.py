@@ -1,7 +1,6 @@
 from src.diff_parser import ChangedLine
 from src.reviewer import ReviewFinding
 
-
 INLINE_CATEGORIES = {
     "correctness",
     "security",
@@ -16,10 +15,7 @@ def validate_findings(
     changed_files: set[str],
     min_confidence: float = 0.75,
 ) -> list[ReviewFinding]:
-    changed_line_keys = {
-        (line.file, line.line)
-        for line in changed_lines
-    }
+    changed_line_keys = {(line.file, line.line) for line in changed_lines}
 
     valid_findings: list[ReviewFinding] = []
 
@@ -46,7 +42,8 @@ def validate_findings(
                 and (
                     finding.file,
                     finding.line,
-                ) not in changed_line_keys
+                )
+                not in changed_line_keys
             ):
                 continue
 
@@ -66,10 +63,7 @@ def validate_findings(
 
         existing = deduplicated.get(key)
 
-        if (
-            existing is None
-            or finding.confidence > existing.confidence
-        ):
+        if existing is None or finding.confidence > existing.confidence:
             deduplicated[key] = finding
 
     return list(deduplicated.values())
