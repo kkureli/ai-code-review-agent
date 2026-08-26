@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from src.diff_parser import parse_changed_lines
+
 
 def run(command: list[str], cwd: str) -> str:
     print(f"\nRunning: {' '.join(command)}")
@@ -100,6 +102,20 @@ def main() -> None:
         cwd=workspace,
     )
 
+    changed_lines = parse_changed_lines(diff)
+    print("\nChanged files:")
+    print(changed_files or "(none)")
+
+    print("\nChanged lines:")
+
+    if not changed_lines:
+        print("(none)")
+    else:
+        for changed_line in changed_lines:
+            print(f"{changed_line.file}:{changed_line.line} {changed_line.content}")
+
+    print("\nRaw diff:")
+    print(diff or "(empty)")
     print("\nChanged files:")
     print(changed_files or "(none)")
 
