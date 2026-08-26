@@ -113,6 +113,18 @@ Never suggest bool(value) as validation for a boolean value because
 non-empty strings such as "false" are truthy. If the required input
 contract is unknown, describe the required validation without inventing
 a concrete implementation.
+
+Ambiguity alone is not a correctness bug.
+
+Do not report a correctness finding when multiple interpretations of
+the intended behavior are possible.
+
+A correctness finding requires evidence from the supplied diff or
+repository context that establishes the expected behavior and shows
+that the implementation violates it.
+
+Unclear naming, undocumented contracts, or uncertainty about intended
+semantics are not findings by themselves.
 """
 
 
