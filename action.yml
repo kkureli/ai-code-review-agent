@@ -1,4 +1,4 @@
-name: "AI Code Review Agent"
+name: "KKureli AI Code Review Agent"
 description: "Automated repository-aware AI code reviews for GitHub pull requests"
 
 branding:
